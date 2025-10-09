@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"github.com/google/uuid"
+	"github.com/louiehdev/chirpy/internal/auth"
 	"github.com/louiehdev/chirpy/internal/database"
 )
 
@@ -54,6 +56,33 @@ func (cfg *apiConfig) healthHandler(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
+	var params struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&params); err != nil {
+		respondWithError(w, 500, "Something went wrong")
+	}
+
+	user, err := cfg.db.GetUserFromEmail(r.Context(), params.Email)
+	if err != nil {
+		respondWithError(w, 401, "incorrect email or password")
+	}
+	if match, _ := auth.CheckPasswordHash(params.Password, user.HashedPassword); !match {
+		respondWithError(w, 401, "incorrect email or password")
+	}
+	userData := database.CreateUserRow{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email}
+
+	respondWithJSON(w, 200, userData)
+}
+
 func (cfg *apiConfig) chirpHandler(w http.ResponseWriter, r *http.Request) {
 	var params database.CreateChirpParams
 	decoder := json.NewDecoder(r.Body)
@@ -74,17 +103,41 @@ func (cfg *apiConfig) chirpHandler(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var params struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&params); err != nil {
 		respondWithError(w, 500, "Something went wrong")
 	}
-	newUser, err := cfg.db.CreateUser(r.Context(), params.Email)
+	hashedPass, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, 500, "Something went wrong")
+	}
+	userParams := database.CreateUserParams{Email: params.Email, HashedPassword: hashedPass}
+	newUser, err := cfg.db.CreateUser(r.Context(), userParams)
 	if err != nil {
 		respondWithError(w, 500, "Something went wrong")
 	}
 
 	respondWithJSON(w, 201, newUser)
+}
+
+func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		respondWithError(w, 500, "Something went wrong")
+	}
+	respondWithJSON(w, 200, chirps)
+}
+
+func (cfg *apiConfig) getChirpFromIDHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("chirpID")
+	idParam, _ := uuid.Parse(id)
+	chirp, err := cfg.db.GetChirpFromID(r.Context(), idParam)
+	if err != nil {
+		respondWithError(w, 404, "Chirp not found")
+	}
+	respondWithJSON(w, 200, chirp)
 }

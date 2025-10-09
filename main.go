@@ -30,7 +30,10 @@ func main() {
 	mux.Handle("/app/", cfg.middlewareMetricsInc(handler))
 	mux.HandleFunc("GET /api/healthz", cfg.healthHandler)
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
+	mux.HandleFunc("GET /api/chirps", cfg.getChirpsHandler)
+	mux.HandleFunc("GET /api/chirps/{chirpID}", cfg.getChirpFromIDHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetHandler)
+	mux.HandleFunc("POST /api/login", cfg.loginHandler)
 	mux.HandleFunc("POST /api/chirps", cfg.chirpHandler)
 	mux.HandleFunc("POST /api/users", cfg.createUserHandler)
 
