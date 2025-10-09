@@ -20,7 +20,7 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/json; charset=utf-8")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	w.Write(errData)
 }
@@ -33,7 +33,7 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/json; charset=utf-8")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	w.Write(jsonData)
 }
