@@ -1,7 +1,12 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexedwards/argon2id"
@@ -46,6 +51,9 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, err
 	}
+	if expTime, err := token.Claims.GetExpirationTime(); err != nil || time.Now().After(expTime.Time) {
+		return uuid.Nil, err
+	}
 	userID, err := token.Claims.GetSubject()
 	if err != nil {
 		return uuid.Nil, err
@@ -55,4 +63,21 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 	return userUUID, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	tokenString := headers.Get("Authorization")
+	if len(tokenString) == 0 {
+		return "", fmt.Errorf("no token string found")
+	}
+
+	return strings.TrimPrefix(tokenString, "Bearer "), nil
+}
+
+func MakeRefreshToken() string {
+	key := make([]byte, 32)
+	rand.Read(key)
+	token := hex.EncodeToString(key)
+
+	return token
 }
