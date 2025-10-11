@@ -18,6 +18,7 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	secret         string
+	polkaKey       string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -97,6 +98,7 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 		CreatedAt    time.Time `json:"created_at"`
 		UpdatedAt    time.Time `json:"updated_at"`
 		Email        string    `json:"email"`
+		IsChirpyRed  bool      `json:"is_chirpy_red"`
 		Token        string    `json:"token"`
 		RefreshToken string    `json:"refresh_token"`
 	}{
@@ -104,6 +106,7 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
 		Token:        accessToken,
 		RefreshToken: refreshToken.Token}
 
@@ -245,6 +248,36 @@ func (cfg *apiConfig) updateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	respondWithJSON(w, 200, updatedUser)
+}
+
+func (cfg *apiConfig) upgradeUserHandler(w http.ResponseWriter, r *http.Request) {
+	if key, err := auth.GetAPIKey(r.Header); err != nil || key != cfg.polkaKey {
+		respondWithError(w, 401, "Unauthorized")
+		return
+	}
+
+	var params struct {
+		Event string `json:"event"`
+		Data  struct {
+			UserID string `json:"user_id"`
+		} `json:"data"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&params); err != nil {
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+	if params.Event != "user.upgraded" {
+		respondWithError(w, 204, "Unknown event")
+		return
+	}
+	userID, _ := uuid.Parse(params.Data.UserID)
+	if err := cfg.db.UpgradeUser(r.Context(), userID); err != nil {
+		respondWithError(w, 404, "User not found")
+		return
+	}
+
+	respondWithError(w, 204, "")
 }
 
 func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {

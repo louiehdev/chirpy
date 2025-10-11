@@ -16,6 +16,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 	secret := os.Getenv("SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -23,7 +24,7 @@ func main() {
 	}
 	dbQueries := database.New(db)
 
-	cfg := apiConfig{db: dbQueries, platform: platform, secret: secret}
+	cfg := apiConfig{db: dbQueries, platform: platform, secret: secret, polkaKey: polkaKey}
 
 	mux := http.NewServeMux()
 	handler := http.StripPrefix("/app", http.FileServer(http.Dir("")))
@@ -39,6 +40,7 @@ func main() {
 	mux.HandleFunc("POST /api/revoke", cfg.revokeHandler)
 	mux.HandleFunc("POST /api/chirps", cfg.chirpHandler)
 	mux.HandleFunc("POST /api/users", cfg.createUserHandler)
+	mux.HandleFunc("POST /api/polka/webhooks", cfg.upgradeUserHandler)
 	mux.HandleFunc("PUT /api/users", cfg.updateUserHandler)
 	mux.HandleFunc("DELETE /api/chirps/{chirpID}", cfg.deleteChirpHandler)
 

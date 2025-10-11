@@ -13,6 +13,11 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 		Error string `json:"error"`
 	}
 
+	if len(msg) == 0 {
+		w.WriteHeader(code)
+		return
+	}
+
 	errData, err := json.Marshal(jsonError{Error: msg})
 	if err != nil {
 		log.Printf("Error marshalling JSON: %s", err)
