@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -281,11 +282,34 @@ func (cfg *apiConfig) upgradeUserHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetChirps(r.Context())
-	if err != nil {
-		respondWithError(w, 500, "Something went wrong")
-		return
+	var chirps []database.Chirp
+	authorID := r.URL.Query().Get("author_id")
+	sortBy := r.URL.Query().Get("sort")
+	if len(authorID) == 0 {
+		chirpsQuery, err := cfg.db.GetChirps(r.Context())
+		if err != nil {
+			respondWithError(w, 500, "Something went wrong")
+			return
+		}
+		chirps = chirpsQuery
+	} else {
+		userID, err := uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, 500, "Something went wrong")
+			return
+		}
+		chirpsQuery, err := cfg.db.GetChirpsFromUser(r.Context(), userID)
+		if err != nil {
+			respondWithError(w, 500, "Something went wrong")
+			return
+		}
+		chirps = chirpsQuery
 	}
+
+	if sortBy == "desc" {
+		sort.Slice(chirps, func(a, b int) bool { return chirps[a].CreatedAt.After(chirps[b].CreatedAt) })
+	}
+
 	respondWithJSON(w, 200, chirps)
 }
 
